@@ -8,12 +8,13 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
-	"github.com/taskcluster/taskcluster/v107/internal/scopes"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/artifacts"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/fileutil"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/process"
+	"github.com/taskcluster/taskcluster/v108/internal/scopes"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/artifacts"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/fileutil"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/process"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -265,7 +266,7 @@ func (atf *ArtifactTaskFeature) FindArtifacts() {
 // TODO: need to also handle "too-large-file-on-worker"
 func resolve(base *artifacts.BaseArtifact, artifactType, path, contentType, contentEncoding string, pd *process.PlatformData, taskDir string) artifacts.TaskArtifact {
 	fullPath := fileutil.AbsFrom(taskDir, path)
-	fileReader, err := os.Open(fullPath)
+	fileReader, err := os.OpenFile(fullPath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		// cannot read file/dir, create an error artifact
 		return &artifacts.ErrorArtifact{
@@ -304,6 +305,14 @@ func resolve(base *artifacts.BaseArtifact, artifactType, path, contentType, cont
 	}
 	if artifactType == "directory" {
 		return nil
+	}
+	if !fileinfo.Mode().IsRegular() {
+		return &artifacts.ErrorArtifact{
+			BaseArtifact: base,
+			Message:      fmt.Sprintf("File artifact '%s' exists but is not a regular file (%v)", fullPath, fileinfo.Mode().Type()),
+			Reason:       "invalid-resource-on-worker",
+			Path:         path,
+		}
 	}
 
 	tempPath, err := copyToTempFileAsTaskUser(fullPath, pd, taskDir)

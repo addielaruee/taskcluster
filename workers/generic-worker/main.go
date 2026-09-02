@@ -29,21 +29,21 @@ import (
 	docopt "github.com/docopt/docopt-go"
 	sysinfo "github.com/elastic/go-sysinfo"
 	"github.com/mcuadros/go-defaults"
-	tcclient "github.com/taskcluster/taskcluster/v107/clients/client-go"
-	"github.com/taskcluster/taskcluster/v107/clients/client-go/tcqueue"
-	"github.com/taskcluster/taskcluster/v107/internal"
-	"github.com/taskcluster/taskcluster/v107/internal/mocktc/tc"
-	"github.com/taskcluster/taskcluster/v107/internal/scopes"
-	"github.com/taskcluster/taskcluster/v107/tools/workerproto"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/artifacts"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/errorreport"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/expose"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/fileutil"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/graceful"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/gwconfig"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/host"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/process"
-	gwruntime "github.com/taskcluster/taskcluster/v107/workers/generic-worker/runtime"
+	tcclient "github.com/taskcluster/taskcluster/v108/clients/client-go"
+	"github.com/taskcluster/taskcluster/v108/clients/client-go/tcqueue"
+	"github.com/taskcluster/taskcluster/v108/internal"
+	"github.com/taskcluster/taskcluster/v108/internal/mocktc/tc"
+	"github.com/taskcluster/taskcluster/v108/internal/scopes"
+	"github.com/taskcluster/taskcluster/v108/tools/workerproto"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/artifacts"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/errorreport"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/expose"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/fileutil"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/graceful"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/gwconfig"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/host"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/process"
+	gwruntime "github.com/taskcluster/taskcluster/v108/workers/generic-worker/runtime"
 	"github.com/xeipuuv/gojsonschema"
 )
 
@@ -1114,11 +1114,7 @@ func (e *ExecutionErrors) add(err *CommandExecutionError) {
 	if err == nil {
 		return
 	}
-	if e == nil {
-		*e = ExecutionErrors{err}
-	} else {
-		*e = append(*e, err)
-	}
+	*e = append(*e, err)
 }
 
 func (e *ExecutionErrors) Error() string {

@@ -12,9 +12,9 @@ import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/taskcluster/httpbackoff/v3"
 	"github.com/taskcluster/slugid-go/slugid"
-	tcclient "github.com/taskcluster/taskcluster/v107/clients/client-go"
-	"github.com/taskcluster/taskcluster/v107/clients/client-go/tcqueue"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/artifacts"
+	tcclient "github.com/taskcluster/taskcluster/v108/clients/client-go"
+	"github.com/taskcluster/taskcluster/v108/clients/client-go/tcqueue"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/artifacts"
 )
 
 var (
@@ -55,15 +55,15 @@ func validateArtifacts(t *testing.T, payloadArtifacts []Artifact, expected []art
 	atf.FindArtifacts()
 	got := atf.artifacts
 
-	// remove the ContentPath field from the got artifacts
-	// if it's of type S3Artifact. We can't compare this
-	// as it's non-deterministic
+	// remove the ContentPath field from the got artifacts, we can't
+	// compare it as it's non-deterministic
 	for _, a := range got {
-		s3Artifact, ok := a.(*artifacts.S3Artifact)
-		if !ok {
-			continue
+		switch artifact := a.(type) {
+		case *artifacts.S3Artifact:
+			artifact.ContentPath = ""
+		case *artifacts.ObjectArtifact:
+			artifact.ContentPath = ""
 		}
-		s3Artifact.ContentPath = ""
 	}
 
 	if !reflect.DeepEqual(got, expected) {

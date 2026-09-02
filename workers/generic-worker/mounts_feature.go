@@ -19,10 +19,10 @@ import (
 	"github.com/mholt/archives"
 	"github.com/taskcluster/httpbackoff/v3"
 	"github.com/taskcluster/slugid-go/slugid"
-	tcclient "github.com/taskcluster/taskcluster/v107/clients/client-go"
-	"github.com/taskcluster/taskcluster/v107/internal/mocktc/tc"
-	"github.com/taskcluster/taskcluster/v107/internal/scopes"
-	"github.com/taskcluster/taskcluster/v107/workers/generic-worker/fileutil"
+	tcclient "github.com/taskcluster/taskcluster/v108/clients/client-go"
+	"github.com/taskcluster/taskcluster/v108/internal/mocktc/tc"
+	"github.com/taskcluster/taskcluster/v108/internal/scopes"
+	"github.com/taskcluster/taskcluster/v108/workers/generic-worker/fileutil"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -257,6 +257,30 @@ func (cache *Cache) Rating() float64 {
 	return float64(cache.LastUsed.Unix())
 }
 
+// sweepUnknownContent deletes anything in dir that is not a cache Location.
+// Failed deletions are retried on the next call (see #8944).
+func sweepUnknownContent(dir string, caches CacheMap) {
+	keep := map[string]bool{}
+	for _, entries := range caches {
+		for _, cache := range entries {
+			keep[filepath.Base(cache.Location)] = true
+		}
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if keep[entry.Name()] {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		if err := os.RemoveAll(path); err != nil {
+			log.Printf("WARNING: could not delete unknown cache content %v: %v", path, err)
+		}
+	}
+}
+
 // Purge unlinks the entry so it can never be served again and deletes its
 // content, deferring the deletion to the last releaseFileCache if tasks are
 // still using it. Unlike Evict, it is for content known to be wrong.
@@ -390,8 +414,9 @@ func (cm *CacheMap) LoadFromFile(stateFile string, cacheDir string) {
 func (feature *MountsFeature) Initialise() error {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
-	fileCaches.LoadFromFile("file-caches.json", config.CachesDir)
-	directoryCaches.LoadFromFile("directory-caches.json", config.DownloadsDir)
+	fileCaches.LoadFromFile("file-caches.json", config.DownloadsDir)
+	directoryCaches.LoadFromFile("directory-caches.json", config.CachesDir)
+	sweepUnknownContent(config.CachesDir, directoryCaches)
 	return nil
 }
 
@@ -605,6 +630,7 @@ func garbageCollection(tasksRunning bool) error {
 	// running potentially slow docker commands (#7).
 	// SortedResources only returns available (not in-use) entries
 	cacheMutex.Lock()
+	sweepUnknownContent(config.CachesDir, directoryCaches)
 	fileResources := fileCaches.SortedResources()
 	cacheMutex.Unlock()
 
@@ -1267,18 +1293,25 @@ func decompress(fsContent FSContent, format string, file string, taskMount *Task
 		if err != nil {
 			return fmt.Errorf("not able to create %v as task user: %v", file, err)
 		}
-		err = dst.Close()
+		defer dst.Close()
+		src, err := os.Open(cacheFile)
 		if err != nil {
-			return fmt.Errorf("not able to close %v: %v", file, err)
+			return fmt.Errorf("not able to open %v: %v", cacheFile, err)
 		}
+		defer src.Close()
 		taskMount.Infof("Copying %v to %v", cacheFile, file)
-		err = copyFileContents(cacheFile, file)
-		if err != nil {
+		if _, err := io.Copy(dst, src); err != nil {
 			// this could be a system error, but it can also be that e.g. the task
 			// specified an invalid path, so resolve as malformed payload rather
 			// than panic
 			taskMount.Errorf("not able to mount content from %v at path %v", fsContent.String(), file)
 			return err
+		}
+		if err := dst.Sync(); err != nil {
+			return fmt.Errorf("not able to flush %v: %w", file, err)
+		}
+		if err := dst.Close(); err != nil {
+			return fmt.Errorf("not able to close %v: %w", file, err)
 		}
 		return nil
 	}

@@ -21,8 +21,6 @@ input PageConnection {
 union Node =
   Artifact |
   Task |
-  Worker |
-  WorkerCompact |
   WMWorker |
   CachePurge |
   SecretListItem |
@@ -31,7 +29,6 @@ union Node =
   WorkerManagerWorkerPoolSummary |
   WorkerManagerProvider |
   WorkerManagerError |
-  HookLastFire |
   WorkerPoolLaunchConfig |
   WorkerPoolLaunchConfigStats
 
